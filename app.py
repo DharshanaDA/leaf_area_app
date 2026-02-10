@@ -67,7 +67,7 @@ if uploaded_file is not None:
         hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
 
         # 2. Broader Green Range (Better for different lighting)
-        lower_green = np.array([25, 30, 30])   # Lowered hue and saturation
+        lower_green = np.array([25, 50, 30])   # Lowered hue and saturation
         upper_green = np.array([95, 255, 255])
         mask = cv2.inRange(hsv, lower_green, upper_green)    
 
