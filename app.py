@@ -34,30 +34,38 @@ uploaded_file = st.file_uploader("Capture leaf", type=["jpg", "jpeg", "png"])
 if uploaded_file is not None:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, 1)
-    
-    # Process image
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blur, 75, 200)
-    
-    # --- DEBUG: See what the computer sees ---
-    with st.expander("Show Edge Detection (Debug)"):
-        st.image(edged, caption="If the board edges aren't solid white lines, detection will fail.")
+    hsv_full = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # --- Step 1: Find the RED Border ---
+    # Red is unique because it's at both ends of the HSV spectrum (0-10 and 170-180)
+    lower_red1 = np.array([0, 70, 50])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 70, 50])
+    upper_red2 = np.array([180, 255, 255])
+    
+    mask_red1 = cv2.inRange(hsv_full, lower_red1, upper_red1)
+    mask_red2 = cv2.inRange(hsv_full, lower_red2, upper_red2)
+    red_mask = mask_red1 + mask_red2
+
+    # Clean up the red mask
+    kernel = np.ones((5,5), np.uint8)
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel)
+
+    # Find the largest red shape
+    contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     target_contour = None
     for c in contours:
         peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-        # We look for the largest 4-sided shape
-        if len(approx) == 4:
+        approx = cv2.approxPolyDP(c, 0.03 * peri, True) # 3% tolerance
+        if len(approx) == 4: # Looking for 4 corners
             target_contour = approx
             break
 
+    # --- Step 2: Process if Board is Found ---
     if target_contour is not None:
-        # Perspective Correction Logic
+        # Perspective Correction (Warp)
         pts = target_contour.reshape(4, 2)
         rect = np.zeros((4, 2), dtype="float32")
         s = pts.sum(axis=1); rect[0] = pts[np.argmin(s)]; rect[2] = pts[np.argmax(s)]
@@ -67,34 +75,33 @@ if uploaded_file is not None:
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(img, M, (400, 300))
 
-        # Green Mask
-        # 1. Convert to HSV
-        hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
-
-        # 2. Broader Green Range (Better for different lighting)
-        lower_green = np.array([25, 50, 30])   # Lowered hue and saturation
+        # --- Step 3: Find the GREEN Leaf inside the warped board ---
+        hsv_warped = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
+        # Broad green range for better detection
+        lower_green = np.array([30, 40, 30]) 
         upper_green = np.array([95, 255, 255])
-        mask = cv2.inRange(hsv, lower_green, upper_green)    
+        leaf_mask = cv2.inRange(hsv_warped, lower_green, upper_green)
+        
+        # Clean leaf mask
+        leaf_mask = cv2.morphologyEx(leaf_mask, cv2.MORPH_OPEN, kernel)
 
-        # 3. Clean up the "noise" (Removes tiny dots that aren't leaves)
-        kernel = np.ones((5,5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # Removes small white dots
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel) # Fills small black holes in leaf
+        # Calculate Area
+        leaf_pixels = cv2.countNonZero(leaf_mask)
+        current_area = (leaf_pixels / (400 * 300)) * 12.0 # (pixels / total) * 3x4 board
 
-        # 4. Final Calculation
-        leaf_pixels = cv2.countNonZero(mask)
-        total_pixels = 400 * 300
-        current_area = (leaf_pixels / total_pixels) * 12.0
+        # Display Results
+        st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption="Detected Board Area")
+        st.image(leaf_mask, caption="What the computer sees as 'Leaf'")
+        st.metric("Detected Leaf Area", f"{current_area:.3f} sq in")
 
         if st.button("✅ Add Leaf to Plant", use_container_width=True):
             st.session_state.total_area += current_area
             st.session_state.leaf_count += 1
             st.session_state.history.append(round(current_area, 3))
             st.rerun()
-
     else:
-        st.error("⚠️ Reference Board Not Detected!")
-        st.info("Ensure the entire 3x4 board is visible and has a clear contrast against the background.")
+        st.error("⚠️ Red border not detected!")
+        st.info("Make sure the entire RED border is visible in the photo.")
 
 st.divider()
 
