@@ -84,16 +84,26 @@ if st.session_state.leaf_count > 0:
             st.error("Please enter a Plant Name before uploading!")
         else:
             try:
-                # Prepare data row
-                new_data = pd.DataFrame([{
+                # 1. Fetch existing data (so we don't overwrite everything)
+                # Ensure the worksheet name matches your tab exactly (e.g., "Sheet1")
+                existing_data = conn.read(worksheet="Sheet1")
+                
+                # 2. Prepare the new row
+
+
+                new_row = pd.DataFrame([{
                     "Plant Name": plant_name,
                     "Leaf Count": st.session_state.leaf_count,
                     "Individual Areas": str(st.session_state.history),
                     "Total Area": round(st.session_state.total_area, 3)
                 }])
                 
-                # Append to sheet
-                conn.create(data=new_data)
+                # 3. Combine them
+                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+                
+                # 4. Use .update to push the new full list
+                conn.update(worksheet="Sheet1", data=updated_df)
+                
                 st.success(f"Data for {plant_name} uploaded successfully!")
             except Exception as e:
                 st.error(f"Upload failed: {e}")
