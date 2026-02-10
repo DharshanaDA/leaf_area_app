@@ -87,6 +87,9 @@ if uploaded_file is not None:
             st.session_state.history.append(round(current_area, 3))
             st.rerun()
 
+    else:
+        st.warning("⚠️ Could not find the 3x4 reference board. Try adjusting the camera angle or lighting.")
+
 st.divider()
 
 # --- Upload to Google Sheets ---
