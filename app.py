@@ -75,19 +75,33 @@ if uploaded_file is not None:
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(img, M, (400, 300))
 
-        # --- Step 3: Find the GREEN Leaf inside the warped board ---
+                # --- Step 3: Advanced Leaf Detection (Adaptive) ---
         hsv_warped = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
-        # Broad green range for better detection
-        lower_green = np.array([30, 40, 30]) 
-        upper_green = np.array([95, 255, 255])
-        leaf_mask = cv2.inRange(hsv_warped, lower_green, upper_green)
         
-        # Clean leaf mask
-        leaf_mask = cv2.morphologyEx(leaf_mask, cv2.MORPH_OPEN, kernel)
-
-        # Calculate Area
-        leaf_pixels = cv2.countNonZero(leaf_mask)
-        current_area = (leaf_pixels / (400 * 300)) * 12.0 # (pixels / total) * 3x4 board
+        # We split the channels to look at 'Saturation' and 'Hue' separately
+        h, s, v = cv2.split(hsv_warped)
+        
+        # 1. Use OTSU Thresholding on the Saturation channel.
+        # This automatically finds the "cut-off" point between the leaf and the board
+        # regardless of whether the light is bright or dim.
+        _, mask_s = cv2.threshold(s, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # 2. Define a very broad Hue range for Green (to handle sunlight shifts)
+        lower_green = np.array([25, 30, 30]) 
+        upper_green = np.array([95, 255, 255])
+        mask_h = cv2.inRange(hsv_warped, lower_green, upper_green)
+        
+        # 3. Combine them: It must be 'Green' AND 'Highly Saturated'
+        final_mask = cv2.bitwise_and(mask_s, mask_h)
+        
+        # 4. Clean up Glare/Reflections (Morphology)
+        # This fills in small white glare spots inside the leaf
+        kernel = np.ones((5,5), np.uint8)
+        final_mask = cv2.morphologyEx(final_mask, cv2.MORPH_CLOSE, kernel)
+        
+        # 5. Area Math
+        leaf_pixels = cv2.countNonZero(final_mask)
+        current_area = (leaf_pixels / (400 * 300)) * 12.0
 
         # Display Results
         st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption="Detected Board Area")
