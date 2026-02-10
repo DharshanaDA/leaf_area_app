@@ -63,11 +63,23 @@ if uploaded_file is not None:
         warped = cv2.warpPerspective(img, M, (400, 300))
 
         # Green Mask
+        # 1. Convert to HSV
         hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, np.array([35, 40, 40]), np.array([90, 255, 255]))
-        
-        current_area = (cv2.countNonZero(mask) / (400 * 300)) * 12.0
-        st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption=f"Area: {current_area:.2f} sq in")
+
+        # 2. Broader Green Range (Better for different lighting)
+        lower_green = np.array([25, 30, 30])   # Lowered hue and saturation
+        upper_green = np.array([95, 255, 255])
+        mask = cv2.inRange(hsv, lower_green, upper_green)    
+
+        # 3. Clean up the "noise" (Removes tiny dots that aren't leaves)
+        kernel = np.ones((5,5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) # Removes small white dots
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel) # Fills small black holes in leaf
+
+        # 4. Final Calculation
+        leaf_pixels = cv2.countNonZero(mask)
+        total_pixels = 400 * 300
+        current_area = (leaf_pixels / total_pixels) * 12.0
 
         if st.button("✅ Add Leaf to Plant", use_container_width=True):
             st.session_state.total_area += current_area
