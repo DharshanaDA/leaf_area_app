@@ -35,11 +35,15 @@ if uploaded_file is not None:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, 1)
     
-    # Process image (Greyscale -> Blur -> Edge)
+    # Process image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(blur, 75, 200)
     
+    # --- DEBUG: See what the computer sees ---
+    with st.expander("Show Edge Detection (Debug)"):
+        st.image(edged, caption="If the board edges aren't solid white lines, detection will fail.")
+
     contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
@@ -47,6 +51,7 @@ if uploaded_file is not None:
     for c in contours:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        # We look for the largest 4-sided shape
         if len(approx) == 4:
             target_contour = approx
             break
@@ -88,7 +93,8 @@ if uploaded_file is not None:
             st.rerun()
 
     else:
-        st.warning("⚠️ Could not find the 3x4 reference board. Try adjusting the camera angle or lighting.")
+        st.error("⚠️ Reference Board Not Detected!")
+        st.info("Ensure the entire 3x4 board is visible and has a clear contrast against the background.")
 
 st.divider()
 
