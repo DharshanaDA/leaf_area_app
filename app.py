@@ -105,7 +105,7 @@ if uploaded_file is not None:
 
         # Display Results
         st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption="Detected Board Area")
-        st.image(leaf_mask, caption="What the computer sees as 'Leaf'")
+        st.image(final_mask, caption="What the computer sees as 'Leaf'")
         st.metric("Detected Leaf Area", f"{current_area:.3f} sq in")
 
         if st.button("✅ Add Leaf to Plant", use_container_width=True):
