@@ -100,7 +100,7 @@ if uploaded_file is not None:
                 # Math: (Pixels / Total Area Pixels) * Total Real Area (3x3 = 9)
                 current_area = (leaf_pixels / (300 * 300)) * 58.0644
                 st.session_state.current_calc = current_area
-                st.metric("Detected Leaf Area", f"{current_area:.3f} sq in")
+                st.metric("Detected Leaf Area", f"{current_area:.3f} cm²")
 
         if 'current_calc' in st.session_state:
             if st.button("✅ Add to History", use_container_width=True):
