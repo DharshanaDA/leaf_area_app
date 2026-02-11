@@ -31,20 +31,18 @@ if uploaded_file is not None:
 
     detection_method = st.selectbox(
         "Select Border Detection Method:",
-        ("Red Border Line", "Blue Corner Dots")
+        ("Blue Corner Dots", "Red Border Line")
     )
     
     target_contour = None
 
     if detection_method == "Red Border Line":
-        # Define Red HSV ranges
+        # Standard Red HSV ranges
         lower_red1, upper_red1 = np.array([0, 70, 50]), np.array([10, 255, 255])
         lower_red2, upper_red2 = np.array([170, 70, 50]), np.array([180, 255, 255])
-        
         mask_red = cv2.inRange(hsv_full, lower_red1, upper_red1) + cv2.inRange(hsv_full, lower_red2, upper_red2)
-        cnts_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        for c in sorted(cnts_red, key=cv2.contourArea, reverse=True):
+        cnts, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in sorted(cnts, key=cv2.contourArea, reverse=True):
             peri = cv2.arcLength(c, True)
             approx = cv2.approxPolyDP(c, 0.03 * peri, True)
             if len(approx) == 4:
@@ -52,108 +50,87 @@ if uploaded_file is not None:
                 break
 
     elif detection_method == "Blue Corner Dots":
-        # Blue Dot Detection
-        lower_blue = np.array([100, 100, 100])
-        upper_blue = np.array([140, 255, 255])
+        # Blue HSV range
+        lower_blue, upper_blue = np.array([100, 100, 100]), np.array([140, 255, 255])
         mask_blue = cv2.inRange(hsv_full, lower_blue, upper_blue)
-        cnts_blue, _ = cv2.findContours(mask_blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-        if len(cnts_blue) >= 4:
+        cnts, _ = cv2.findContours(mask_blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if len(cnts) >= 4:
             dot_centers = []
-            for c in sorted(cnts_blue, key=cv2.contourArea, reverse=True)[:4]:
+            for c in sorted(cnts, key=cv2.contourArea, reverse=True)[:4]:
                 M = cv2.moments(c)
                 if M["m00"] != 0:
                     dot_centers.append([int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])])
-        
             if len(dot_centers) == 4:
                 target_contour = np.array(dot_centers, dtype="float32")
 
-    # --- Step 2: Perspective Warp ---
+    # --- Step 2: Square Perspective Warp ---
     if target_contour is not None:
         pts = target_contour
         rect = np.zeros((4, 2), dtype="float32")
         s = pts.sum(axis=1)
-        rect[0] = pts[np.argmin(s)] 
-        rect[2] = pts[np.argmax(s)] 
+        rect[0] = pts[np.argmin(s)] # TL
+        rect[2] = pts[np.argmax(s)] # BR
         diff = np.diff(pts, axis=1)
-        rect[1] = pts[np.argmin(diff)] 
-        rect[3] = pts[np.argmax(diff)] 
+        rect[1] = pts[np.argmin(diff)] # TR
+        rect[3] = pts[np.argmax(diff)] # BL
 
-        dst = np.array([[0, 0], [400, 0], [400, 300], [0, 300]], dtype="float32")
+        # DESTINATION: Perfectly square 300x300 pixels
+        dst = np.array([[0, 0], [300, 0], [300, 300], [0, 300]], dtype="float32")
         M = cv2.getPerspectiveTransform(rect, dst)
-        warped = cv2.warpPerspective(img, M, (400, 300))
+        warped = cv2.warpPerspective(img, M, (300, 300))
         
         st.subheader("Fine-Tune Leaf Detection")
-        
-        # Sliders for Dynamic Adjustment
-        hue_range = st.slider("Select Hue Range (Yellow to Green)", 0, 180, (20, 90))
-        sat_min = st.slider("Minimum Saturation (Filters Grey/Perspex Glare)", 0, 255, 40)
+        hue_range = st.slider("Select Hue Range (Yellow to Green)", 0, 180, (25, 90))
+        sat_min = st.slider("Minimum Saturation (Filter Glare)", 0, 255, 40)
 
         hsv_warped = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
-        lower_bound = np.array([hue_range[0], sat_min, 30])
-        upper_bound = np.array([hue_range[1], 255, 255])
-        
-        # This is the "mask" variable that caused the NameError if called 'leaf_mask' elsewhere
-        mask = cv2.inRange(hsv_warped, lower_bound, upper_bound)
+        mask = cv2.inRange(hsv_warped, np.array([hue_range[0], sat_min, 30]), np.array([hue_range[1], 255, 255]))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7,7), np.uint8))
 
         col_img, col_mask = st.columns(2)
-        result_img = cv2.bitwise_and(warped, warped, mask=mask)
-        
-        col_img.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption="Detected Board Area")
-        # FIX: Ensure caption matches your previous 'leaf_mask' usage to avoid confusion
-        col_mask.image(mask, caption="What the computer sees as 'Leaf'")
-        
-        st.image(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB), caption="Background Removed View")
+        col_img.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB), caption="Warped Square Area")
+        col_mask.image(mask, caption="Leaf Mask")
 
         if st.button("📊 Calculate Leaf Area"):
             leaf_pixels = cv2.countNonZero(mask)
-            if leaf_pixels < 500:
-                st.warning("Detection area too small. Adjust sliders.")
+            if leaf_pixels < 300:
+                st.warning("Detection area too small.")
             else:
-                current_area = (leaf_pixels / (400 * 300)) * 12.0
+                # Math: (Pixels / Total Area Pixels) * Total Real Area (3x3 = 9)
+                current_area = (leaf_pixels / (300 * 300)) * 9.0
                 st.session_state.current_calc = current_area
-                st.metric("Calculated Leaf Area", f"{current_area:.3f} sq in")
+                st.metric("Detected Leaf Area", f"{current_area:.3f} sq in")
 
         if 'current_calc' in st.session_state:
-            if st.button("✅ Add this Calculation to History", use_container_width=True):
+            if st.button("✅ Add to History", use_container_width=True):
                 st.session_state.total_area += st.session_state.current_calc
                 st.session_state.leaf_count += 1
                 st.session_state.history.append(round(st.session_state.current_calc, 3))
                 del st.session_state.current_calc
                 st.rerun()
     else:
-        st.error(f"⚠️ {detection_method} not detected! Ensure all markers are visible.")
+        st.error("⚠️ Markers not detected. Ensure all dots/borders are visible.")
 
-# --- Metrics and Upload ---
+# --- Metrics and Sheets Upload ---
 st.divider()
 c1, c2 = st.columns(2)
 c1.metric("Leaves Found", st.session_state.leaf_count)
 c2.metric("Total Area", f"{st.session_state.total_area:.2f} sq in")
 
 if st.session_state.leaf_count > 0:
-    if st.button("📤 Upload Plant Data to Google Sheets", type="primary", use_container_width=True):
+    if st.button("📤 Upload to Google Sheets", type="primary", use_container_width=True):
         if not plant_name:
-            st.error("Please enter a Plant Name before uploading!")
+            st.error("Please enter a Plant Name!")
         else:
             try:
                 existing_data = conn.read(worksheet="Sheet1")
-                new_row = pd.DataFrame([{
-                    "Plant Name": plant_name,
-                    "Leaf Count": st.session_state.leaf_count,
-                    "Individual Areas": str(st.session_state.history),
-                    "Total Area": round(st.session_state.total_area, 3)
-                }])
-                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-                conn.update(worksheet="Sheet1", data=updated_df)
-                st.success(f"Data for {plant_name} uploaded successfully!")
+                new_row = pd.DataFrame([{"Plant Name": plant_name, "Leaf Count": st.session_state.leaf_count, "History": str(st.session_state.history), "Total Area": round(st.session_state.total_area, 3)}])
+                conn.update(worksheet="Sheet1", data=pd.concat([existing_data, new_row], ignore_index=True))
+                st.success("Uploaded!")
             except Exception as e:
-                st.error(f"Upload failed: {e}")
+                st.error(f"Failed: {e}")
 
-if st.button("🗑️ Reset Everything", use_container_width=True):
-    st.session_state.total_area = 0.0
-    st.session_state.leaf_count = 0
-    st.session_state.history = []
-    if 'current_calc' in st.session_state: del st.session_state.current_calc
+if st.button("🗑️ Reset", use_container_width=True):
+    st.session_state.total_area, st.session_state.leaf_count, st.session_state.history = 0.0, 0, []
     st.rerun()
