@@ -9,7 +9,7 @@ st.set_page_config(page_title="Leaf Tracker Pro", layout="centered")
 # --- Google Sheets Connection ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("🌿 Plant Data to Google Sheets")
+st.title("🌿 Leaf Area Calculator")
 
 # --- Initialize Memory ---
 if 'total_area' not in st.session_state:
@@ -98,7 +98,7 @@ if uploaded_file is not None:
                 st.warning("Detection area too small.")
             else:
                 # Math: (Pixels / Total Area Pixels) * Total Real Area (3x3 = 9)
-                current_area = (leaf_pixels / (300 * 300)) * 9.0
+                current_area = (leaf_pixels / (300 * 300)) * 58.0644
                 st.session_state.current_calc = current_area
                 st.metric("Detected Leaf Area", f"{current_area:.3f} sq in")
 
