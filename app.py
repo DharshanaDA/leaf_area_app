@@ -109,3 +109,40 @@ col1.metric("Leaves Found", st.session_state.leaf_count)
 col2.metric("Total Area", f"{st.session_state.total_area:.2f} sq in")
 
 # ... [Keep your existing Google Sheets upload and Reset button code here] ...
+# --- Upload to Google Sheets ---
+if st.session_state.leaf_count > 0:
+    if st.button("📤 Upload Plant Data to Google Sheets", type="primary", use_container_width=True):
+        if not plant_name:
+            st.error("Please enter a Plant Name before uploading!")
+        else:
+            try:
+                # 1. Fetch existing data (so we don't overwrite everything)
+                # Ensure the worksheet name matches your tab exactly (e.g., "Sheet1")
+                existing_data = conn.read(worksheet="Sheet1")
+                
+                # 2. Prepare the new row
+
+
+                new_row = pd.DataFrame([{
+                    "Plant Name": plant_name,
+                    "Leaf Count": st.session_state.leaf_count,
+                    "Individual Areas": str(st.session_state.history),
+                    "Total Area": round(st.session_state.total_area, 3)
+                }])
+                
+                # 3. Combine them
+                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+                
+                # 4. Use .update to push the new full list
+                conn.update(worksheet="Sheet1", data=updated_df)
+                
+                st.success(f"Data for {plant_name} uploaded successfully!")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
+
+# Reset
+if st.button("🗑️ Reset Everything", use_container_width=True):
+    st.session_state.total_area = 0.0
+    st.session_state.leaf_count = 0
+    st.session_state.history = []
+    st.rerun()
