@@ -29,48 +29,44 @@ if uploaded_file is not None:
     img = cv2.imdecode(file_bytes, 1)
     hsv_full = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
+    detection_method = st.selectbox("Select Border Detection Method:",("Red Border Line", "Blue Corner Dots"))
+    
     # --- Step 1: Find the RED Border (Same as before) ---
     
-    # Define Masks
-    lower_red1, upper_red1 = np.array([0, 70, 50]), np.array([10, 255, 255])
-    lower_red2, upper_red2 = np.array([170, 70, 50]), np.array([180, 255, 255])
-    mask_red = cv2.inRange(hsv_full, lower_red1, upper_red1) + cv2.inRange(hsv_full, lower_red2, upper_red2)
-
-    lower_blue, upper_blue = np.array([100, 150, 50]), np.array([140, 255, 255])
-    mask_blue = cv2.inRange(hsv_full, lower_blue, upper_blue)
-
     target_contour = None
 
-    # TRY RED BORDER FIRST
-    cnts_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for c in sorted(cnts_red, key=cv2.contourArea, reverse=True):
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.03 * peri, True)
-        if len(approx) == 4:
-            target_contour = approx.reshape(4, 2)
-            st.info("✅ Board detected using Red Border")
-            break
+    if detection_method == "Red Border Line":
+        # Red detection logic as before
+        mask_red = cv2.inRange(hsv_full, lower_red1, upper_red1) + cv2.inRange(hsv_full, lower_red2, upper_red2)
+        cnts_red, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in sorted(cnts_red, key=cv2.contourArea, reverse=True):
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.03 * peri, True)
+            if len(approx) == 4:
+                target_contour = approx.reshape(4, 2)
+                break
 
-    # TRY BLUE DOT BACKUP IF RED FAILS
-    if target_contour is None:
+    elif detection_method == "Blue Corner Dots":
+        # NEW: Blue Dot Detection using Centroids
+        lower_blue = np.array([100, 100, 100])
+        upper_blue = np.array([140, 255, 255])
+        mask_blue = cv2.inRange(hsv_full, lower_blue, upper_blue)
         cnts_blue, _ = cv2.findContours(mask_blue, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
         if len(cnts_blue) >= 4:
+            # Find centers of the 4 largest dots
             dot_centers = []
-            # Find centers of the 4 largest blue dots
             for c in sorted(cnts_blue, key=cv2.contourArea, reverse=True)[:4]:
                 M = cv2.moments(c)
                 if M["m00"] != 0:
-                    cX = int(M["m10"] / M["m00"])
-                    cY = int(M["m01"] / M["m00"])
-                    dot_centers.append([cX, cY])
+                    dot_centers.append([int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])])
         
             if len(dot_centers) == 4:
                 target_contour = np.array(dot_centers, dtype="float32")
-                st.info("🔵 Board detected using Blue Corner Dots")
 
-    # --- Step 2: Perspective Warp (with Correct Point Ordering) ---
+    # --- Step 2: Perspective Warp ---
     if target_contour is not None:
-        # Order points: Top-Left, Top-Right, Bottom-Right, Bottom-Left
+        # Consistency is key: sort the 4 points into a fixed order
         pts = target_contour
         rect = np.zeros((4, 2), dtype="float32")
         s = pts.sum(axis=1)
@@ -79,8 +75,8 @@ if uploaded_file is not None:
         diff = np.diff(pts, axis=1)
         rect[1] = pts[np.argmin(diff)] # Top-right
         rect[3] = pts[np.argmax(diff)] # Bottom-left
-    
-        # Map to 4x3 ratio
+
+        # Match your 4" x 3" board aspect ratio
         dst = np.array([[0, 0], [400, 0], [400, 300], [0, 300]], dtype="float32")
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(img, M, (400, 300))
