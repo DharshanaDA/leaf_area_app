@@ -29,7 +29,10 @@ if uploaded_file is not None:
     img = cv2.imdecode(file_bytes, 1)
     hsv_full = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    detection_method = st.selectbox("Select Border Detection Method:",("Red Border Line", "Blue Corner Dots"))
+    detection_method = st.selectbox(
+        "Select Border Detection Method:",
+        ("Red Border Line", "Blue Corner Dots")
+    )
     
     # --- Step 1: Find the RED Border (Same as before) ---
     
