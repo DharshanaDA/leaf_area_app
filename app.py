@@ -15,10 +15,14 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Reuse the GSheets service account credentials for Google Drive API
 try:
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com"
+    ]
     creds_info = st.secrets["connections"]["gsheets"]
     creds = service_account.Credentials.from_service_account_info(
         creds_info, 
-        scopes=["https://www.googleapis.com", "https://www.googleapis.com"]
+        scopes= scopes
     )
     drive_service = build('drive', 'v3', credentials=creds)
 except Exception as e:
