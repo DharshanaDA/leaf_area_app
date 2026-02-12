@@ -3,11 +3,26 @@ import cv2
 import numpy as np
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import io
+from google.oauth2 import service_account
 
 st.set_page_config(page_title="Leaf Tracker Pro", layout="centered")
 
 # --- Google Sheets Connection ---
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+# --- Google Drive Setup ---
+# Access your secrets (ensure 'connections.gsheets' contains your service account info)
+creds_info = st.secrets["connections"]["gsheets"]
+creds = service_account.Credentials.from_service_account_info(
+    creds_info, 
+    scopes=["https://www.googleapis.com"]
+)
+drive_service = build('drive', 'v3', credentials=creds)
+
+DRIVE_FOLDER_ID = "1sG5ks-zPAxErSm5aGAtykUWaiMeZRdl1" # Replace with your Folder ID
 
 st.title("🌿 Leaf Area Calculator")
 
@@ -111,6 +126,21 @@ if uploaded_file is not None:
                 st.rerun()
     else:
         st.error("⚠️ Markers not detected. Ensure all dots/borders are visible.")
+
+# --- Upload nadir and side view images---
+def upload_to_drive(file_buffer, file_name):
+    media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg')
+    file_metadata = {'name': file_name, 'parents': [DRIVE_FOLDER_ID]}
+    drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+# --- Capture UI ---
+st.subheader("📸 Plant Overview Photos")
+col_side, col_nadir = st.columns(2)
+
+with col_side:
+    side_img = st.camera_input("Side View", key="side")
+with col_nadir:
+    nadir_img = st.camera_input("Nadir (Top) View", key="nadir")
 
 # --- Metrics and Sheets Upload ---
 st.divider()
