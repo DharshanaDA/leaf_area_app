@@ -17,7 +17,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 try:
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com"
+        "https://www.googleapis.com/auth/drive"
     ]
     creds_info = st.secrets["connections"]["gsheets"]
     creds = service_account.Credentials.from_service_account_info(
