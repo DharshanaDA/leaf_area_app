@@ -11,22 +11,21 @@ from google.oauth2 import service_account
 st.set_page_config(page_title="Leaf Tracker Pro", layout="centered")
 
 # --- 1. Google Drive & Sheets Connection Setup ---
+# --- 1. Google Drive & Sheets Connection Setup ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Reuse the GSheets service account credentials for Google Drive API
 try:
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive.file"
-    ]
+    # Get credentials directly from the GSheets connection to avoid mismatch
+    creds = conn._instance._credentials 
+    drive_service = build('drive', 'v3', credentials=creds)
+except Exception as e:
+    # If the above fails, use your existing secrets method
     creds_info = st.secrets["connections"]["gsheets"]
     creds = service_account.Credentials.from_service_account_info(
         creds_info, 
-        scopes= scopes
+        scopes=["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/spreadsheets"]
     )
     drive_service = build('drive', 'v3', credentials=creds)
-except Exception as e:
-    st.error(f"Authentication Error: {e}")
 
 DRIVE_FOLDER_ID = "1sG5ks-zPAxErSm5aGAtykUWaiMeZRdl1"  # <--- REPLACE THIS WITH YOUR FOLDER ID
 
