@@ -150,7 +150,7 @@ if uploaded_file is not None:
             if leaf_pixels < 300:
                 st.warning("Detection area too small.")
             else:
-                current_area = (leaf_pixels / (300 * 300)) * 58.0644
+                current_area = (leaf_pixels / (300 * 300)) * 64
                 st.session_state.current_calc = current_area
                 st.metric("Detected Leaf Area", f"{current_area:.3f} cm²")
 
