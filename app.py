@@ -70,9 +70,11 @@ plant_name = st.text_input("Enter Plant Name/ID:", placeholder="e.g. Tomato_Plan
 st.subheader("📸 Plant Overview Photos")
 col_side, col_nadir = st.columns(2)
 with col_side:
-    side_img = st.camera_input("Side View", key="side")
+    # Use file_uploader to get full camera resolution
+    side_img = st.file_uploader("Upload Side View", type=["jpg", "jpeg", "png"], key="side_up")
+
 with col_nadir:
-    nadir_img = st.camera_input("Nadir (Top) View", key="nadir")
+    nadir_img = st.file_uploader("Upload Nadir (Top) View", type=["jpg", "jpeg", "png"], key="nadir_up")
 
 st.divider()
 
