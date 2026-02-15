@@ -31,8 +31,6 @@ DRIVE_FOLDER_ID = "0AAkmovKASPt_Uk9PVA"  # <--- REPLACE THIS WITH YOUR FOLDER ID
 
 def upload_to_drive(file_buffer, file_name):
     """Helper function to upload image buffer to Google Drive"""
-    def upload_to_drive(file_buffer, file_name):
-    """Helper function to upload to a Shared Drive"""
     try:
         # 1. Setup Media
         media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg', resumable=True)
