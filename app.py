@@ -33,7 +33,7 @@ def upload_to_drive(file_buffer, file_name):
     """Helper function to upload image buffer to Google Drive"""
     media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg')
     file_metadata = {'name': file_name, 'parents': [DRIVE_FOLDER_ID]}
-    drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    drive_service.files().create(body=file_metadata, media_body=media, fields='id', supportsAllDrives=True).execute()
 
 st.title("🌿 Leaf Area Calculator")
 
