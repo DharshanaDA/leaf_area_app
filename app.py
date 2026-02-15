@@ -31,9 +31,30 @@ DRIVE_FOLDER_ID = "0AAkmovKASPt_Uk9PVA"  # <--- REPLACE THIS WITH YOUR FOLDER ID
 
 def upload_to_drive(file_buffer, file_name):
     """Helper function to upload image buffer to Google Drive"""
-    media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg')
-    file_metadata = {'name': file_name, 'parents': [DRIVE_FOLDER_ID]}
-    drive_service.files().create(body=file_metadata, media_body=media, fields='id', supportsAllDrives=True).execute()
+    def upload_to_drive(file_buffer, file_name):
+    """Helper function to upload to a Shared Drive"""
+    try:
+        # 1. Setup Media
+        media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg', resumable=True)
+        
+        # 2. Setup Metadata (Ensure DRIVE_FOLDER_ID is the folder INSIDE the Shared Drive)
+        file_metadata = {
+            'name': file_name,
+            'parents': [DRIVE_FOLDER_ID]
+        }
+        
+        # 3. Execute with Shared Drive Flags
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id',
+            supportsAllDrives=True  # This is the crucial flag for Shared Drives
+        ).execute()
+        
+        return file.get('id')
+    except Exception as e:
+        st.error(f"Drive Upload Error: {e}")
+        raise e
 
 st.title("🌿 Leaf Area Calculator")
 
