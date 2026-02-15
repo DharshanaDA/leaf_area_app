@@ -27,7 +27,7 @@ except Exception as e:
     )
     drive_service = build('drive', 'v3', credentials=creds)
 
-DRIVE_FOLDER_ID = "1sG5ks-zPAxErSm5aGAtykUWaiMeZRdl1"  # <--- REPLACE THIS WITH YOUR FOLDER ID
+DRIVE_FOLDER_ID = "0AAkmovKASPt_Uk9PVA"  # <--- REPLACE THIS WITH YOUR FOLDER ID
 
 def upload_to_drive(file_buffer, file_name):
     """Helper function to upload image buffer to Google Drive"""
