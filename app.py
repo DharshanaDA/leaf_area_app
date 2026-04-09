@@ -32,6 +32,17 @@ DRIVE_FOLDER_ID = "0AAkmovKASPt_Uk9PVA"  # <--- REPLACE THIS WITH YOUR FOLDER ID
 def upload_to_drive(file_buffer, file_name):
     """Helper function to upload image buffer to Google Drive"""
     try:
+        # NEW: Resize image to reduce upload time by ~80%
+        img_np = cv2.imdecode(np.frombuffer(file_buffer.getvalue(), np.uint8), 1)
+        # Resize to a max width of 1024px while keeping aspect ratio
+        height, width = img_np.shape[:2]
+        scaling_factor = 1024 / float(width)
+        low_res_img = cv2.resize(img_np, (1024, int(height * scaling_factor)))
+        
+        # Convert back to buffer
+        _, buffer = cv2.imencode('.jpg', low_res_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        optimized_buffer = io.BytesIO(buffer)
+        
         # 1. Setup Media
         media = MediaIoBaseUpload(file_buffer, mimetype='image/jpeg', resumable=True)
         
